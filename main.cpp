@@ -4,18 +4,32 @@
 #include <list>
 #include <fstream>
 #include <time.h>
+#include <stack>
+#include <string.h>
 #define NIL -1
 using namespace std;
+#define MAX_VERTEX_SIZE 301
 int j=0;//get the numbers of AP
 int edge=0;// the sum of edges remain as m
 int vertex=0;// the sum of vertices
-// A class that represents an undirected graph
+// A class that represents a directed graph
 int root[100],rankk[100];
 //初始化n个元素
-
+int num=0;
+int timee=0;//dfs order
+int loww[MAX_VERTEX_SIZE];
+int dfnn[MAX_VERTEX_SIZE];
+int visit[MAX_VERTEX_SIZE];
+int inStack[MAX_VERTEX_SIZE];
+bool valid[MAX_VERTEX_SIZE];
+int scc=0;//count for # of strong connected component in graph
+stack<int> st;
+stack<int> big;
+ofstream out;
 class Graph
 {
     int V;    // No. of vertices
+    int deletenum; //No. of deleted vertices
     list<int> *adj;    // A dynamic array of adjacency lists
     void APUtil(int v, bool visited[], int disc[], int low[],
                 int parent[], bool ap[]);
@@ -23,327 +37,311 @@ public:
     Graph(int V);   // Constructor
     void addEdge(int v, int w);   // function to add an edge to graph
     void deleteVertex(int v,bool* valid); //function to delete an edge in graph
-    void AP(int* A,bool* valid);    // prints articulation points
     void printGraph(int V,bool* valid);         // prints the remainder giant graph
+    void tarjan(int u,int really);
+    Graph(const Graph &graph);
+    ~Graph();//free me
     //void UnionFind(bool* valid);    // get the maximum connected subgraph(s)
 };
 
 Graph::Graph(int V)//default
 {
     this->V = V;
+    this->deletenum=0;
     adj = new list<int>[V];
+}
+
+Graph::Graph(const Graph &graph)//deep copy
+{
+    this->V=graph.V;
+    this->deletenum=graph.deletenum;
+    //cout<<"V is "<<V<<endl;
+    adj = new list<int>[V];
+    for (int i = 0; i < V; i++)
+    {
+        if(valid[i]==true)
+        {
+            list<int>::iterator k;
+            for (k = graph.adj[i].begin(); k != graph.adj[i].end(); ++k)
+            {
+                addEdge(i,*k);
+            }
+        }
+    }
+}
+
+Graph::~Graph()
+{
+    //cout<<"delete!"<<endl;
+    free(adj);
 }
 
 void Graph::addEdge(int v, int w)
 {
     adj[v].push_back(w);
-    adj[w].push_back(v);  // Note: the graph is undirected
+    //adj[w].push_back(v);  // Note: the graph is directed
 }
 
 void Graph::deleteVertex(int v,bool* valid)
 {
+    if(valid[v]==false)
+        cout<<"delete again!"<<endl;
     list<int>::iterator i;
-    for (i = adj[v].begin(); i != adj[v].end(); ++i)
+    int k;
+    for (k=0; k<num; k++)
     {
-        int w = *i;
-        //cout<<v<<' '<<w<<endl;
-        adj[w].remove(v);//let other vertex forget it
+        adj[k].remove(v);
     }
     adj[v].clear();//clear itself with other vertices
     valid[v]=false;
-    // Note: the graph is undirected
-}
-
-// A recursive function that find articulation points using DFS traversal
-// u --> The vertex to be visited next
-// visited[] --> keeps tract of visited vertices
-// disc[] --> Stores discovery times of visited vertices
-// parent[] --> Stores parent vertices in DFS tree
-// ap[] --> Store articulation points
-void Graph::APUtil(int u, bool visited[], int disc[],
-                   int low[], int parent[], bool ap[])
-{
-    // A static variable is used for simplicity, we can avoid use of static
-    // variable by passing a pointer.
-    static int time = 0;
-
-    // Count of children in DFS Tree
-    int children = 0;
-
-    // Mark the current node as visited
-    visited[u] = true;
-
-    // Initialize discovery time and low value
-    disc[u] = low[u] = ++time;
-
-    // Go through all vertices aadjacent to this
-    list<int>::iterator i;
-    for (i = adj[u].begin(); i != adj[u].end(); ++i)
-    {
-        int v = *i;  // v is current adjacent of u
-
-        // If v is not visited yet, then make it a child of u
-        // in DFS tree and recur for it
-        if (!visited[v])
-        {
-            children++;
-            parent[v] = u;
-            APUtil(v, visited, disc, low, parent, ap);
-
-            // Check if the subtree rooted with v has a connection to
-            // one of the ancestors of u
-            low[u]  = min(low[u], low[v]);
-
-            // u is an articulation point in following cases
-
-            // (1) u is root of DFS tree and has two or more chilren.
-            if (parent[u] == NIL && children > 1)
-            {
-                ap[u] = true;
-                //cout<<"root is "<<u<<" it has "<<children<<" children"<<endl;
-            }
-            // (2) If u is not root and low value of one of its child is more
-            // than discovery value of u.
-            if (parent[u] != NIL && low[v] >= disc[u])
-            {
-                ap[u] = true;
-                //cout<<"leaf is "<<u<<" it has "<<children<<" children"<<endl;
-            }
-        }
-
-        // Update low value of u for parent function calls.
-        else if (v != parent[u])
-            low[u]  = min(low[u], disc[v]);
-    }
-    //cout<<"point is "<<u<<" it has "<<children<<" children"<<endl;
-}
-
-// The function to do DFS traversal. It uses recursive function APUtil()
-void Graph::AP(int* A,bool* valid)
-{
-    j=0;
-    // Mark all the vertices as not visited
-    bool *visited = new bool[V];
-    int *disc = new int[V];
-    int *low = new int[V];
-    int *parent = new int[V];
-    bool *ap = new bool[V]; // To store articulation points
-
-    // Initialize parent and visited, and ap(articulation point) arrays
-    for (int i = 0; i < V; i++)
-    {
-        parent[i] = NIL;
-        visited[i] = false;
-        ap[i] = false;
-    }
-
-    // Call the recursive helper function to find articulation points
-    // in DFS tree rooted with vertex 'i'
-    for (int i = 0; i < V; i++)
-        if (visited[i] == false)
-            APUtil(i, visited, disc, low, parent, ap);
-
-    // Now ap[] contains articulation points, print them
-    for (int i = 0; i < V; i++)
-        if (ap[i] == true&&valid[i]==true)
-        {
-            //cout << i << " ";
-            A[j++]=i;
-        }
-}
-
-void init(int n, bool* valid)
-{
-    for(int i=0; i<n; i++)
-    {
-        if(valid[i]==true)
-        {
-            root[i]=i;
-            rankk[i]=0;
-        }
-//        else
-//        {
-//            root[i]=-1;
-//            rankk[i]=-1;
-//        }
-    }
-}
-//查询树的根
-int find(int x)
-{
-    if(root[x]==x)
-    {
-        return x;
-    }
-    else
-    {
-        return root[x]=find(root[x]);
-    }
-}
-//合并x和y所属的集合
-void unite(int x,int y)
-{
-    x=find(x);
-    y=find(y);
-    if(x==y)
-        return;
-    if(rankk[x]<rankk[y])
-    {
-        root[x]=y;
-    }
-    else
-    {
-        root[y]=x;
-        if(rankk[x]==rankk[y])
-        {
-            rankk[x]++;
-        }
-    }
+    deletenum++;
+    // Note: the graph is directed
 }
 
 void Graph::printGraph(int V,bool* valid)
 {
     edge=0;
     vertex=0;
-    cout<<"This is the output of the remainder graph"<<endl;
+    out<<"This is the output of the remainder graph"<<endl;
     for (int i = 0; i < V; i++)
     {
         if(valid[i]==true)
         {
             vertex++;
-            cout<<"This is the point "<<i<<" along with its edges"<<endl;
+            //out<<"This is the point "<<i<<" along with its edges"<<endl;
             list<int>::iterator k;
             for (k = adj[i].begin(); k != adj[i].end(); ++k)
             {
                 int w=*k;
-                //union start
-                unite(i,w);
                 edge++;
-                cout<<i<<" to "<<w<<endl;
+                //out<<i<<" to "<<w<<endl;
+                out<<i<<' '<<w<<endl;
             }
         }
     }
+    out<<"delete "<<deletenum<<" vertices"<<endl;
+}
+
+int min(int a,int b)
+{
+    if(a>b)
+        return b;
+    else
+        return a;
+}
+
+void Graph::tarjan(int u,int really)//really 0->test; 1->regular; 2->keep largest SCCs
+{
+    //cout<<"exploring "<<u<<endl;
+    int index=0;
+    dfnn[u] = loww[u] = timee++;
+    st.push(u);
+    visit[u] = 1;
+    inStack[u] = 1;
+    list<int>::iterator v;
+    if(!adj[u].empty())//no vertex out
+    {
+//        //cout<<"this node "<<u<<" doesn't has any edge out"<<endl;
+//        if(really)
+//            deleteVertex(u,valid);
+//    }
+//    else
+//    {
+        for(v = adj[u].begin(); v != adj[u].end(); ++v)
+        {
+            if(visit[*v] == 0)
+            {
+                tarjan(*v,really);
+                //cout<<"we're comparing"<<loww[u]<<" and "<<loww[*v]<<endl;
+                loww[u] = min(loww[u],loww[*v]);
+            }
+            else
+            {
+                if(inStack[*v]==1)
+                    loww[u] = min(loww[u],dfnn[*v]);
+            }
+        }
+    }
+
+    if(dfnn[u] == loww[u])
+    {
+        int vtx;
+        index=0;//refresh?
+        int temp[num+1];//store scc elements
+        //cout<<"set is: ";
+        do
+        {
+            vtx = st.top();
+            st.pop();
+            inStack[vtx] = 0;//表示已经出栈
+            temp[index]=vtx;
+            index++;
+        }
+        while(vtx !=u );
+        //cout<<"total is "<<index<<endl;
+        if(index==1)//we don't need one point CC in real tarjan
+        {
+            //cout<<temp[0]<<' ';
+            if(really)//it's not attempting!
+            {
+                cout<<"isolated point "<<temp[0]<<endl;
+                deleteVertex(temp[0],valid);
+                //valid[temp[0]]=false;
+            }
+            //deleteVertex(temp[0],valid);
+            //graph.valid[temp[0]]=false;
+        }
+        else
+        {
+            if(really==2)//print SCC>=2 in the final graph
+            {
+                for(int indexx=0; indexx<index; indexx++)
+                    out<<temp[indexx]<<' ';
+                out<<"end"<<endl;
+            }
+            scc++;//only take scc>=2 into account as good scc
+        }
+        //cout<<"end"<<endl;
+    }
+    if(really==0&&index==1)
+        scc++;//accept in attempting to detect any possible APs
+    //cout<<"vertex "<<u<<" dfn "<<dfn[u]<<' '<<" low "<<low[u]<<endl;
 }
 
 void print(int* A)
 {
-    cout<<"This is the output of AP points array"<<endl;
+    out<<"This is the output of AP points array"<<endl;
     for(int i=0; i<j; i++)
-        cout<<A[i]<<' ';
-    cout<<endl;
+        out<<A[i]<<' ';
+    out<<endl;
 }
 
 int main()
 {
+    //int max_scc=0;//store largest number of elements among all SCCs
     clock_t start,off;
-    // Create graphs given in above diagrams
     ifstream in;
     start=clock();
-    in.open("first.txt");
-    int num;
+    in.open("Edges_threshold.txt");
+    out.open("rslt.txt");
     in>>num;
     Graph g(num);
-    bool* valid=new bool[num];
     for(int i=0; i<num; i++)
         valid[i]=true;
     int* array=new int[num];//an array to store all the AP
     int edge1,edge2;
+    int back1,back2=0;
     while(!in.eof())
     {
         in>>edge1;
         in>>edge2;
+        if (back1==edge1 &&back2==edge2)
+        {
+            break;
+        }
+        back1=edge1;//backup
+        back2=edge2;//backup, avoid repeating
         g.addEdge(edge1,edge2);
     }
-    g.AP(array,valid);
-    print(array);
-    while(j!=0)
+    int flag=0;// test case, set 1 to ignore
+    //g.printGraph(num,valid);//initial graph
+    while(j!=0||flag==0)//we want to get SCC first
     {
+        cout<<"a new loop!"<<endl;
+        if(j==0)
+            flag=1;
+        timee=0;
+        while(!st.empty())//clear
+        {
+            st.pop();
+        }
+        for(int i=0; i<num; i++)
+        {
+            visit[i]=0;
+            dfnn[i]=0;
+            loww[i]=0;
+            inStack[i]=0;
+        }
         for(int i=0; i<j; i++)
         {
             g.deleteVertex(array[i],valid);
         }
-        //find the maximum connected subgraph after deleting those AP points above
-        init(num,valid);
-        g.printGraph(num,valid);// for union find
-        int sum1[100]= {0},sum2[100]= {0};
-        int sum=0;
-        int p=0;
-        for (p = 0; p < num; p++)
-        {
-            if(valid[p]==true)
+        j=0;//renew
+        for(int i =0; i<=num; i++)
+            if(visit[i] == 0&&valid[i])
             {
-                sum1[sum]=root[p];
-                break;
+                g.tarjan(i,1);
             }
-        }
-        sum++;
-        for(int i=0; i<num; i++)
+        int current_scc=scc;
+        //cout<<"current scc is "<<current_scc<<endl;
+        for(int k =0; k<=num; k++)
         {
-            if(i!=p&&valid[i]==true)
+            scc=0;
+            if(valid[k])//test by deleting it first
             {
-                for(int l=0; l<sum; l++)
+                //cout<<"We are trying to delete "<<k<<endl;
+                Graph gg(g);
+                gg.deleteVertex(k,valid);
+                //gg.printGraph(num,valid);
+                timee=0;
+                while(!st.empty())//clear
                 {
-                    if(root[i]==sum1[l])
-                        break;
-                    if(l==sum-1)
-                    {
-                        sum1[sum]=root[i];
-                        sum++;
-                    }
+                    st.pop();
                 }
-            }
-        }
-        //cout<<"There are "<<sum<<" different clusters"<<endl;
-        for(int i=0; i<sum; i++)
-        {
-            for(int l=0; l<num; l++)
-            {
-                if (valid[l]==true)
+                for(int i=0; i<num; i++)
                 {
-                    if(root[l]==sum1[i])
-                    {
-                        sum2[i]++;
-                    }
+                    visit[i]=0;
+                    dfnn[i]=0;
+                    loww[i]=0;
+                    inStack[i]=0;
                 }
-            }
-        }
-        int maxx=0;
-        for(int i=0; i<sum; i++)
-        {
-            if(maxx<=sum2[i])
-                maxx=sum2[i];
-        }
-        cout<<"maxx is "<<maxx<<" sum is "<<sum<<endl;
-        /* helper function
-        for(int i=0; i<sum; i++)
-        {
-            cout<<sum1[i]<<' '<<sum2[i]<<endl;
-        }
-        for(int i=0;i<num;i++)
-        {
-            if(valid[i]==true)
-                cout<<"i is "<<i<<" its parent is "<<root[i]<<endl;
-        }
-        */
-        for(int i=0; i<sum; i++)
-        {
-            if(maxx>sum2[i])
-            {
-                for(int l=0; l<num; l++)
-                    if(root[l]==sum1[i])
+                for(int i =0; i<=num; i++)
+                    if(visit[i] == 0&&valid[i])
                     {
-                        valid[l]=false;
-                        g.deleteVertex(l,valid);
+                        gg.tarjan(i,0);
                     }
+                int temp_scc=scc;
+                cout<<"after trying to delete "<<k<<" we get "<<temp_scc<<" before "<<current_scc<<endl;
+                if(temp_scc>current_scc)
+                {
+                    cout<<"find one "<<k<<endl;
+                    array[j++]=k;
+                }
+                valid[k]=true;//resume it!
             }
-            if(maxx==sum2[i])
-                cout<<"This is the subgraph's root whom has "<<maxx<<" vertices: "<<sum1[i]<<endl;
+            else//this vertex is not valid for some reason
+            {
+                continue;
+            }
         }
-        g.AP(array,valid);
         print(array);
     }
+    //The output is several SCCs without any articulation point
+    timee=0;
+    while(!st.empty())//clear
+    {
+        st.pop();
+    }
+    for(int i=0; i<num; i++)
+    {
+        visit[i]=0;
+        dfnn[i]=0;
+        loww[i]=0;
+        inStack[i]=0;
+    }
+    for(int i=0; i<j; i++)
+    {
+        g.deleteVertex(array[i],valid);
+    }
+    j=0;//renew
+    for(int i =0; i<=num; i++)
+        if(visit[i] == 0&&valid[i])
+        {
+            g.tarjan(i,2);//only keep largest SCC(s)
+        }
     g.printGraph(num,valid);
     off=clock();
-    cout<<"Runtime is "<<off-start<<" ms"<<endl;
+    out<<"Runtime is "<<off-start<<" ms"<<endl;
+    out.close();
     return 0;
 }
