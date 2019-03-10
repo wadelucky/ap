@@ -10,9 +10,9 @@ int j=0;//get the numbers of AP
 int edge=0;// the sum of edges remain as m
 int vertex=0;// the sum of vertices
 // A class that represents an undirected graph
-int root[100],rankk[100];
+int root[301],rankk[301];//assume 301 is max, actually there can be more
 //初始化n个元素
-
+ofstream out;
 class Graph
 {
     int V;    // No. of vertices
@@ -24,7 +24,7 @@ public:
     void addEdge(int v, int w);   // function to add an edge to graph
     void deleteVertex(int v,bool* valid); //function to delete an edge in graph
     void AP(int* A,bool* valid);    // prints articulation points
-    void printGraph(int V,bool* valid);         // prints the remainder giant graph
+    void printGraph(int V,bool* valid,bool really);         // prints the remainder giant graph
     //void UnionFind(bool* valid);    // get the maximum connected subgraph(s)
 };
 
@@ -201,17 +201,17 @@ void unite(int x,int y)
     }
 }
 
-void Graph::printGraph(int V,bool* valid)
+void Graph::printGraph(int V,bool* valid,bool really)
 {
     edge=0;
     vertex=0;
-    cout<<"This is the output of the remainder graph"<<endl;
+    if(really)out<<"This is the output of the remainder graph"<<endl;
     for (int i = 0; i < V; i++)
     {
         if(valid[i]==true)
         {
             vertex++;
-            cout<<"This is the point "<<i<<" along with its edges"<<endl;
+            if(really)out<<"This is the point "<<i<<" along with its edges"<<endl;
             list<int>::iterator k;
             for (k = adj[i].begin(); k != adj[i].end(); ++k)
             {
@@ -219,7 +219,7 @@ void Graph::printGraph(int V,bool* valid)
                 //union start
                 unite(i,w);
                 edge++;
-                cout<<i<<" to "<<w<<endl;
+                if(really)out<<i<<" to "<<w<<endl;
             }
         }
     }
@@ -227,10 +227,10 @@ void Graph::printGraph(int V,bool* valid)
 
 void print(int* A)
 {
-    cout<<"This is the output of AP points array"<<endl;
+    out<<"This is the output of AP points array"<<endl;
     for(int i=0; i<j; i++)
-        cout<<A[i]<<' ';
-    cout<<endl;
+        out<<A[i]<<' ';
+    out<<endl;
 }
 
 int main()
@@ -240,6 +240,7 @@ int main()
     ifstream in;
     start=clock();
     in.open("first.txt");
+    out.open("undirected.txt");
     int num;
     in>>num;
     Graph g(num);
@@ -264,8 +265,8 @@ int main()
         }
         //find the maximum connected subgraph after deleting those AP points above
         init(num,valid);
-        g.printGraph(num,valid);// for union find
-        int sum1[100]= {0},sum2[100]= {0};
+        g.printGraph(num,valid,false);// for union find
+        int sum1[301]= {0},sum2[301]= {0};
         int sum=0;
         int p=0;
         for (p = 0; p < num; p++)
@@ -313,7 +314,7 @@ int main()
             if(maxx<=sum2[i])
                 maxx=sum2[i];
         }
-        cout<<"maxx is "<<maxx<<" sum is "<<sum<<endl;
+        out<<"maxx cc is "<<maxx<<" total cc are(is) "<<sum<<endl;
         /* helper function
         for(int i=0; i<sum; i++)
         {
@@ -333,17 +334,19 @@ int main()
                     if(root[l]==sum1[i])
                     {
                         valid[l]=false;
+                        //cout<<"delete "<<l<<endl;
                         g.deleteVertex(l,valid);
                     }
             }
             if(maxx==sum2[i])
-                cout<<"This is the subgraph's root whom has "<<maxx<<" vertices: "<<sum1[i]<<endl;
+                out<<"This is the subgraph's root whom has "<<maxx<<" vertices: "<<sum1[i]<<endl;
         }
         g.AP(array,valid);
         print(array);
     }
-    g.printGraph(num,valid);
+    g.printGraph(num,valid,true);
     off=clock();
-    cout<<"Runtime is "<<off-start<<" ms"<<endl;
+    out<<"Runtime is "<<off-start<<" ms"<<endl;
+    out.close();
     return 0;
 }
