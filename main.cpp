@@ -12,6 +12,7 @@ using namespace std;
 int j=0;//get the numbers of AP
 int edge=0;// the sum of edges remain as m
 int vertex=0;// the sum of vertices
+int large=0;//use to store the largest SCC(s) in the remainder graph at last
 // A class that represents a directed graph
 int root[100],rankk[100];
 //初始化n个元素
@@ -22,13 +23,14 @@ int dfnn[MAX_VERTEX_SIZE];
 int visit[MAX_VERTEX_SIZE];
 int inStack[MAX_VERTEX_SIZE];
 bool valid[MAX_VERTEX_SIZE];
+int belong[MAX_VERTEX_SIZE];//calculate the element belong to what size of SCC
 int scc=0;//count for # of strong connected component in graph
 stack<int> st;
 stack<int> big;
 ofstream out;
 class Graph
 {
-    int V;    // No. of vertices
+    int V;    // No. of vertices from 0 to V(actually V+1 as 0 is always a dummy one)
     int deletenum; //No. of deleted vertices
     list<int> *adj;    // A dynamic array of adjacency lists
     void APUtil(int v, bool visited[], int disc[], int low[],
@@ -48,7 +50,7 @@ Graph::Graph(int V)//default
 {
     this->V = V;
     this->deletenum=0;
-    adj = new list<int>[V];
+    adj = new list<int>[V+1];
 }
 
 Graph::Graph(const Graph &graph)//deep copy
@@ -56,8 +58,8 @@ Graph::Graph(const Graph &graph)//deep copy
     this->V=graph.V;
     this->deletenum=graph.deletenum;
     //cout<<"V is "<<V<<endl;
-    adj = new list<int>[V];
-    for (int i = 0; i < V; i++)
+    adj = new list<int>[V+1];
+    for (int i = 0; i <= V; i++)
     {
         if(valid[i]==true)
         {
@@ -88,7 +90,7 @@ void Graph::deleteVertex(int v,bool* valid)
         cout<<"delete again!"<<endl;
     list<int>::iterator i;
     int k;
-    for (k=0; k<num; k++)
+    for (k=0; k<=num; k++)
     {
         adj[k].remove(v);
     }
@@ -103,10 +105,11 @@ void Graph::printGraph(int V,bool* valid)
     edge=0;
     vertex=0;
     out<<"This is the output of the remainder graph"<<endl;
-    for (int i = 0; i < V; i++)
+    for (int i = 0; i <= V; i++)
     {
         if(valid[i]==true)
         {
+            //cout<<"vertex "<<i<<" belongs to a SCC with "<<belong[i]<<" elements"<<endl;
             vertex++;
             //out<<"This is the point "<<i<<" along with its edges"<<endl;
             list<int>::iterator k;
@@ -119,6 +122,7 @@ void Graph::printGraph(int V,bool* valid)
             }
         }
     }
+    out<<"largest SCC has "<<large<<" vertices"<<endl;
     out<<"delete "<<deletenum<<" vertices"<<endl;
 }
 
@@ -195,8 +199,12 @@ void Graph::tarjan(int u,int really)//really 0->test; 1->regular; 2->keep larges
         {
             if(really==2)//print SCC>=2 in the final graph
             {
+                if(large<index)large=index;
                 for(int indexx=0; indexx<index; indexx++)
+                {
                     out<<temp[indexx]<<' ';
+                    belong[temp[indexx]]=index;//very tricky!
+                }
                 out<<"end"<<endl;
             }
             scc++;//only take scc>=2 into account as good scc
@@ -222,12 +230,18 @@ int main()
     clock_t start,off;
     ifstream in;
     start=clock();
+    //in.open("first.txt");
     in.open("Edges_threshold.txt");
     out.open("rslt.txt");
     in>>num;
     Graph g(num);
-    for(int i=0; i<num; i++)
+    //initialization for valid, belong, and array
+    for(int i=0; i<=num; i++)
         valid[i]=true;
+    for(int i=0;i<=num;i++)
+    {
+        belong[i]=0;
+    }
     int* array=new int[num];//an array to store all the AP
     int edge1,edge2;
     int back1,back2=0;
@@ -255,7 +269,7 @@ int main()
         {
             st.pop();
         }
-        for(int i=0; i<num; i++)
+        for(int i=0; i<=num; i++)
         {
             visit[i]=0;
             dfnn[i]=0;
@@ -288,7 +302,7 @@ int main()
                 {
                     st.pop();
                 }
-                for(int i=0; i<num; i++)
+                for(int i=0; i<=num; i++)
                 {
                     visit[i]=0;
                     dfnn[i]=0;
@@ -322,7 +336,7 @@ int main()
     {
         st.pop();
     }
-    for(int i=0; i<num; i++)
+    for(int i=0; i<=num; i++)
     {
         visit[i]=0;
         dfnn[i]=0;
@@ -337,8 +351,14 @@ int main()
     for(int i =0; i<=num; i++)
         if(visit[i] == 0&&valid[i])
         {
-            g.tarjan(i,2);//only keep largest SCC(s)
+            g.tarjan(i,2);//only keep elements at least 2 of SCC(s)
         }
+    for(int i=0;i<=num;i++)
+        if(valid[i]&&belong[i]<large)
+    {
+        cout<<"vertex "<<i<<" is not in the biggest SCC(s) because it belongs to a SCC whom has "<<belong[i]<<" elements"<<endl;
+        g.deleteVertex(i,valid);
+    }
     g.printGraph(num,valid);
     off=clock();
     out<<"Runtime is "<<off-start<<" ms"<<endl;
